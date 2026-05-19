@@ -1,0 +1,33 @@
+name: Keep Hugging Face Space Alive
+
+on:
+  schedule:
+    - cron: '0 0,12 * * *'
+  workflow_dispatch:
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Interval and Wake Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          CURRENT_HOURS=$(($(date +%s) / 3600))
+          
+          if [ $((CURRENT_HOURS % 36)) -eq 0 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Condition met. Triggering..."
+            
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              "https://huggingface.co/api/spaces/tpc-pascal/digital-library/restart" \
+              -H "Authorization: Bearer $HF_TOKEN")
+            
+            if [ "$RESPONSE" -eq 200 ] || [ "$RESPONSE" -eq 201 ]; then
+              echo "Success: Space is running."
+            else
+              echo "Error: API failed with HTTP status $RESPONSE"
+              exit 1
+            fi
+          else
+            echo "Skipped: 36-hour interval not reached."
+          fi

@@ -1,0 +1,66 @@
+name: Sync to Hugging Face Hub
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Setup Git LFS
+        run: |
+          git lfs install
+          git lfs pull
+
+      - name: Sync and Push to HF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          TEMP_DIR="../hf_sync_internal"
+          rm -rf $TEMP_DIR
+          mkdir -p $TEMP_DIR
+
+          if [ -d "hf" ]; then
+            echo "Copying contents from hf folder..."
+            cp -r hf/. $TEMP_DIR/
+          fi
+
+          if [ -d "books" ]; then
+            echo "Copying books folder..."
+            cp -r books $TEMP_DIR/
+          fi
+
+          if [ -d "images" ]; then
+            echo "Copying images folder..."
+            cp -r images $TEMP_DIR/
+          fi
+
+          if [ ! -f "$TEMP_DIR/.gitattributes" ]; then
+            echo "*.pdf filter=lfs diff=lfs merge=lfs -text" > $TEMP_DIR/.gitattributes
+            echo "*.png filter=lfs diff=lfs merge=lfs -text" >> $TEMP_DIR/.gitattributes
+            echo "*.jpg filter=lfs diff=lfs merge=lfs -text" >> $TEMP_DIR/.gitattributes
+          fi
+
+          cd $TEMP_DIR
+
+          git config --global init.defaultBranch main
+          git init
+          git lfs install
+          
+          git config user.name "tpc-pascal"
+          git config user.email "tpcmemory2005@gmail.com"
+
+          git add .
+          git commit -m "ci: sync hf, books, and images to space"
+
+          git push --force https://tpc-pascal:$HF_TOKEN@huggingface.co/spaces/tpc-pascal/digital-library main
